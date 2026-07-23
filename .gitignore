@@ -1,2 +1,5 @@
 .superpowers/
 docs/superpowers/
+node_modules
+dist
+coverage

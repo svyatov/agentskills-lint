@@ -1,0 +1,55 @@
+{
+  "name": "agentskills-lint",
+  "version": "0.1.0",
+  "description": "Zero-config linter for the Agent Skills specification (agentskills.io).",
+  "license": "MIT",
+  "author": "Leonid Svyatov <leonid@svyatov.com>",
+  "homepage": "https://github.com/svyatov/agentskills-lint#readme",
+  "bugs": {
+    "url": "https://github.com/svyatov/agentskills-lint/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svyatov/agentskills-lint.git"
+  },
+  "keywords": [
+    "agent-skills",
+    "skill",
+    "linter",
+    "agentskills",
+    "cli",
+    "typescript"
+  ],
+  "type": "module",
+  "bin": {
+    "agentskills-lint": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/lint.d.ts",
+      "default": "./dist/lint.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "biome check . && tsc",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}
