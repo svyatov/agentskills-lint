@@ -44,6 +44,7 @@ export function render(result: Result, opts: RenderOptions): string {
     else byFile.set(f.file, [f]);
   }
   for (const [file, findings] of byFile) {
+    findings.sort((a, b) => a.line - b.line || a.col - b.col);
     out.push(paint(file, C.bold, opts.color));
     for (const f of findings) {
       const sev =

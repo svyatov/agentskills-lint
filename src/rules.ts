@@ -176,11 +176,15 @@ const SPEC_KEYS = new Set([
 ]);
 const TRIGGER_CUES = [/\bwhen\b/i, /\bif\b/i, /\buse\b/i, /\bfor\b/i];
 
+// ponytail: TLD list is a heuristic ceiling; a real local file named e.g. `notes.io` would be skipped. Extend the list if that ever bites.
+const COMMON_TLD = /\.(com|org|net|io|dev|co|app|ai|gov|edu|info|xyz|sh)$/i;
+
 function cleanRef(raw: string | undefined): string | null {
   if (!raw) return null;
-  const p = (raw.split("#")[0] ?? "").split("?")[0]?.trim() ?? "";
+  const p = ((raw.split("#")[0] ?? "").split("?")[0]?.trim() ?? "").replace(/[.,;:!?)\]}]+$/, "");
   if (p === "" || p.startsWith("/") || p.startsWith("#")) return null;
   if (/^[a-z][a-z0-9+.-]*:/i.test(p)) return null; // http:, https:, mailto:
+  if (COMMON_TLD.test(p.split("/")[0] ?? "")) return null; // example.com, www.foo.io/page
   if (!p.includes("/") && !/\.[A-Za-z0-9]+$/.test(p)) return null;
   return p;
 }

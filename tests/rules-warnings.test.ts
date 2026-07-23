@@ -53,3 +53,19 @@ it("flags a reference nested too deep", () => {
   );
   expect(out).toContain("reference-depth");
 });
+
+it("does not flag a reference that ends a sentence with a period", () => {
+  const out = rulesOf(
+    "---\nname: demo\ndescription: Extracts data. Use when the user mentions extraction.\n---\nRun scripts/extract.py.\n",
+    { "scripts/extract.py": "print('x')\n" },
+  );
+  expect(out).not.toContain("broken-reference");
+});
+
+it("does not flag a scheme-less external link as a broken reference", () => {
+  expect(
+    rulesOf(
+      "---\nname: demo\ndescription: Extracts data. Use when the user mentions extraction.\n---\nSee [the site](example.com) and [docs](www.foo.io/page.html).\n",
+    ),
+  ).not.toContain("broken-reference");
+});

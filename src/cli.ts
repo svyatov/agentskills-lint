@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { NoSkillsError } from "./discover.ts";
 import { lint } from "./lint.ts";
 import { computeExit, render } from "./report.ts";
@@ -30,4 +31,4 @@ export function run(argv: string[]): number {
   }
 }
 
-if (import.meta.main) process.exit(run(process.argv));
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) process.exit(run(process.argv));
