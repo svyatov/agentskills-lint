@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+# Least-privilege default for all jobs; `publish` widens it locally for OIDC.
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun test --coverage --coverage-reporter=lcov --coverage-reporter=text
+      - uses: codecov/codecov-action@v7
+        with:
+          files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+        # Codecov requires an upload token on a protected default branch, even
+        # for public repos. Add it once: `gh secret set CODECOV_TOKEN` with the
+        # value from the repo's page on codecov.io.
+      - run: bun run check
+      - run: bun run lint:pkg
+      # The CLI ships for Node consumers but the suite runs under Bun. Install
+      # the packed tarball under the minimum supported Node and run the real bin
+      # on a skill with errors: it must exit non-zero. A no-op bin (the class of
+      # bug where the entry guard never fires on an older Node) would exit 0 and
+      # fail here instead of shipping.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.12'
+      - run: |
+          npm pack
+          WORK="$(mktemp -d)"
+          cd "$WORK"
+          npm init -y >/dev/null 2>&1
+          npm install "$GITHUB_WORKSPACE"/agentskills-lint-*.tgz >/dev/null 2>&1
+          node -e "import('agentskills-lint').then(m => { if (typeof m.lint !== 'function') throw new Error('missing lint export') })"
+          mkdir -p Bad
+          printf -- '---\nname: Bad\ndescription: short\n---\n' > Bad/SKILL.md
+          if ./node_modules/.bin/agentskills-lint Bad; then
+            echo "expected a non-zero exit for a skill with errors"; exit 1
+          fi
+
+  # Publishes on a pushed version tag (e.g. `git tag v0.2.0 && git push --tags`)
+  # via npm OIDC trusted publishing: no token, provenance attached automatically.
+  # One-time setup on npmjs.com: package -> Settings -> Trusted Publisher ->
+  # GitHub Actions, owner `svyatov`, repo `agentskills-lint`, workflow file
+  # `ci.yml`, action `npm publish`. The package must already exist, so the very
+  # first version is published manually.
+  publish:
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC trusted publishing + provenance
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest # OIDC trusted publishing needs npm >= 11.5.1
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: npm publish --access public
