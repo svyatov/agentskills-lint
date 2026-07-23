@@ -1,6 +1,6 @@
 {
   "name": "agentskills-lint",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-config linter for the Agent Skills specification (agentskills.io)",
   "license": "MIT",
   "author": "Leonid Svyatov <leonid@svyatov.com>",

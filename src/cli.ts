@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { NoSkillsError } from "./discover.ts";
 import { lint } from "./lint.ts";
@@ -31,4 +31,10 @@ export function run(argv: string[]): number {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) process.exit(run(process.argv));
+// argv[1] is the invoked path (often a bin symlink); realpath it so it matches
+// import.meta.url, which Node reports as the resolved target. Comparing the raw
+// symlink path never matches, leaving the CLI a silent no-op under npx/global installs.
+const entry = process.argv[1];
+if (entry && import.meta.url === pathToFileURL(realpathSync(entry)).href) {
+  process.exit(run(process.argv));
+}
