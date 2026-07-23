@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "module": "nodenext",
-    "target": "es2023",
-    "lib": ["es2023"],
+    "target": "es2024",
+    "lib": ["es2024"],
     "strict": true,
     "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,

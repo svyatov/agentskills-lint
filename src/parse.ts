@@ -1,65 +1,41 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseDocument } from "yaml";
-import type { Finding, SkillContext } from "./types.ts";
-
-function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+import type { SkillContext } from "./types.ts";
 
 export function parse(dir: string): SkillContext {
   const file = join(dir, "SKILL.md");
   const raw = readFileSync(file, "utf8");
   const lines = raw.split("\n");
-  const yamlErrors: Finding[] = [];
-  const keyPositions: Record<string, { line: number; col: number }> = {};
-  let frontmatter: Record<string, unknown> | null = null;
-  let body = raw;
-  let bodyStartLine = 1;
+  const ctx: SkillContext = {
+    dir,
+    file,
+    lines,
+    frontmatter: null,
+    body: raw,
+    bodyStartLine: 1,
+    yamlErrors: [],
+    keyPositions: {},
+  };
+  const fail = (message: string, line = 1, col = 1) => {
+    ctx.yamlErrors.push({ file, line, col, severity: "error", rule: "frontmatter-parse", message });
+  };
 
   if (lines[0]?.trim() !== "---") {
-    yamlErrors.push({
-      file,
-      line: 1,
-      col: 1,
-      severity: "error",
-      rule: "frontmatter-parse",
-      message: "SKILL.md must begin with YAML frontmatter delimited by `---`.",
-    });
-    return { dir, file, raw, lines, frontmatter, body, bodyStartLine, yamlErrors, keyPositions };
+    fail("SKILL.md must begin with YAML frontmatter delimited by `---`.");
+    return ctx;
   }
 
-  let end = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i]?.trim() === "---") {
-      end = i;
-      break;
-    }
-  }
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
   if (end === -1) {
-    yamlErrors.push({
-      file,
-      line: 1,
-      col: 1,
-      severity: "error",
-      rule: "frontmatter-parse",
-      message: "Frontmatter opening `---` has no closing `---`.",
-    });
-    return { dir, file, raw, lines, frontmatter, body, bodyStartLine, yamlErrors, keyPositions };
+    fail("Frontmatter opening `---` has no closing `---`.");
+    return ctx;
   }
 
-  const fmText = lines.slice(1, end).join("\n");
-  const doc = parseDocument(fmText, { prettyErrors: true });
+  const doc = parseDocument(lines.slice(1, end).join("\n"), { prettyErrors: true });
   for (const e of doc.errors) {
     const lc = e.linePos?.[0];
-    yamlErrors.push({
-      file,
-      line: (lc ? lc.line : 1) + 1,
-      col: lc ? lc.col : 1,
-      severity: "error",
-      rule: "frontmatter-parse",
-      message: e.message,
-    });
+    fail(e.message, (lc?.line ?? 1) + 1, lc?.col ?? 1);
   }
 
   let js: unknown = null;
@@ -69,28 +45,21 @@ export function parse(dir: string): SkillContext {
     js = null;
   }
   if (js && typeof js === "object" && !Array.isArray(js)) {
-    frontmatter = js as Record<string, unknown>;
-    for (const key of Object.keys(frontmatter)) {
-      const re = new RegExp(`^${escapeRe(key)}\\s*:`);
-      for (let i = 1; i < end; i++) {
-        if (re.test(lines[i] ?? "")) {
-          keyPositions[key] = { line: i + 1, col: 1 };
-          break;
-        }
+    const frontmatter = js as Record<string, unknown>;
+    ctx.frontmatter = frontmatter;
+    // One scan of the frontmatter lines instead of a generated regex per key:
+    // first top-level `key:` wins, which is what the per-key search returned.
+    for (let i = 1; i < end; i++) {
+      const key = /^([^:]+?)\s*:/.exec(lines[i] ?? "")?.[1];
+      if (key && Object.hasOwn(frontmatter, key) && !Object.hasOwn(ctx.keyPositions, key)) {
+        ctx.keyPositions[key] = { line: i + 1, col: 1 };
       }
     }
   } else if (doc.errors.length === 0) {
-    yamlErrors.push({
-      file,
-      line: 1,
-      col: 1,
-      severity: "error",
-      rule: "frontmatter-parse",
-      message: "Frontmatter is not a YAML mapping.",
-    });
+    fail("Frontmatter is not a YAML mapping.");
   }
 
-  body = lines.slice(end + 1).join("\n");
-  bodyStartLine = end + 2;
-  return { dir, file, raw, lines, frontmatter, body, bodyStartLine, yamlErrors, keyPositions };
+  ctx.body = lines.slice(end + 1).join("\n");
+  ctx.bodyStartLine = end + 2;
+  return ctx;
 }
