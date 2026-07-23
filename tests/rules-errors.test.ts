@@ -48,3 +48,30 @@ it("accepts a clean skill", () => {
   expect(clean).not.toContain("name-charset");
   expect(clean).not.toContain("description-required");
 });
+
+it("flags an over-long name", () => {
+  const long = "a".repeat(65);
+  expect(
+    rulesOf(`---\nname: ${long}\ndescription: A clear description of when to use.\n---\nB\n`, long),
+  ).toContain("name-length");
+});
+
+it("flags an over-long description", () => {
+  expect(rulesOf(`---\nname: demo\ndescription: ${"d".repeat(1025)}\n---\nB\n`)).toContain(
+    "description-length",
+  );
+});
+
+it("flags over-long compatibility", () => {
+  expect(
+    rulesOf(
+      `---\nname: demo\ndescription: A clear description of when to use.\ncompatibility: ${"c".repeat(501)}\n---\nB\n`,
+    ),
+  ).toContain("compatibility-length");
+});
+
+it("flags a missing name", () => {
+  expect(rulesOf("---\ndescription: A clear description of when to use.\n---\nB\n")).toContain(
+    "name-required",
+  );
+});
