@@ -1,3 +1,4 @@
+import { styleText } from "node:util";
 import type { Finding, Result } from "./types.ts";
 
 export interface RenderOptions {
@@ -6,16 +7,10 @@ export interface RenderOptions {
   color: boolean;
 }
 
-const C = {
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  dim: "\x1b[2m",
-  bold: "\x1b[1m",
-  reset: "\x1b[0m",
-};
-
-function paint(s: string, code: string, on: boolean): string {
-  return on ? code + s + C.reset : s;
+// `color` is the caller's decision (the CLI derives it from isTTY and NO_COLOR),
+// so skip the stream sniffing styleText would otherwise do against process.stdout.
+function paint(s: string, style: Parameters<typeof styleText>[0], on: boolean): string {
+  return on ? styleText(style, s, { validateStream: false }) : s;
 }
 
 function counts(findings: Finding[]): { errs: number; warns: number } {
@@ -34,25 +29,19 @@ export function computeExit(result: Result, strict: boolean): number {
 }
 
 export function render(result: Result, opts: RenderOptions): string {
-  if (opts.json) return JSON.stringify(result.findings, null, 2);
+  if (opts.json) return JSON.stringify(result, null, 2);
 
   const out: string[] = [];
-  const byFile = new Map<string, Finding[]>();
-  for (const f of result.findings) {
-    const arr = byFile.get(f.file);
-    if (arr) arr.push(f);
-    else byFile.set(f.file, [f]);
-  }
-  for (const [file, findings] of byFile) {
+  for (const [file, findings] of Map.groupBy(result.findings, (f) => f.file)) {
     findings.sort((a, b) => a.line - b.line || a.col - b.col);
-    out.push(paint(file, C.bold, opts.color));
+    out.push(paint(file, "bold", opts.color));
     for (const f of findings) {
       const sev =
         f.severity === "error"
-          ? paint("error", C.red, opts.color)
-          : paint("warning", C.yellow, opts.color);
+          ? paint("error", "red", opts.color)
+          : paint("warning", "yellow", opts.color);
       out.push(
-        `  ${paint(`${f.line}:${f.col}`, C.dim, opts.color)}  ${sev}  ${f.rule}  ${f.message}`,
+        `  ${paint(`${f.line}:${f.col}`, "dim", opts.color)}  ${sev}  ${f.rule}  ${f.message}`,
       );
     }
   }

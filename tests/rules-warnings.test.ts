@@ -69,3 +69,48 @@ it("does not flag a scheme-less external link as a broken reference", () => {
     ),
   ).not.toContain("broken-reference");
 });
+
+it("flags a long description that never says when to use the skill", () => {
+  expect(
+    rulesOf(
+      "---\nname: demo\ndescription: Converts spreadsheet cells into tidy database rows quickly.\n---\nBody.\n",
+    ),
+  ).toContain("description-weak");
+});
+
+it("measures description length before trimming", () => {
+  // A block scalar keeps a trailing newline; 39 visible characters plus it clears
+  // the 40-character floor, exactly as `description-length` would count it.
+  const desc = "Extracts the data. Use when extracting.";
+  expect(desc).toHaveLength(39);
+  expect(rulesOf(`---\nname: demo\ndescription: |\n  ${desc}\n---\nBody.\n`)).not.toContain(
+    "description-weak",
+  );
+});
+
+it("flags a body over the line budget", () => {
+  const body = "line\n".repeat(501);
+  expect(
+    rulesOf(
+      `---\nname: demo\ndescription: Extracts data. Use when the user mentions extraction.\n---\n${body}`,
+    ),
+  ).toContain("body-line-limit");
+});
+
+it("flags a body over the token budget", () => {
+  const body = `${"word ".repeat(4001)}\n`;
+  expect(
+    rulesOf(
+      `---\nname: demo\ndescription: Extracts data. Use when the user mentions extraction.\n---\n${body}`,
+    ),
+  ).toContain("body-token-estimate");
+});
+
+it("does not treat a ./-prefixed reference as nested", () => {
+  const out = rulesOf(
+    "---\nname: demo\ndescription: Extracts data. Use when the user mentions extraction.\n---\nSee [notes](./references/a.md).\n",
+    { "references/a.md": "x\n" },
+  );
+  expect(out).not.toContain("reference-depth");
+  expect(out).not.toContain("broken-reference");
+});

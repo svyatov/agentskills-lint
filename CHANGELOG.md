@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** `--json` now emits `{ "findings": [...], "skillCount": n }`
+  instead of a bare findings array, so JSON consumers can read the skill count
+  the human output already reported.
+
+### Fixed
+
+- `description-weak` measured the description after trimming, so a block scalar
+  (`description: |`) lost its trailing newline and could fall under the
+  40-character floor that `description-length` counts it as clearing.
+- `reference-depth` flagged `./references/a.md` as nested more than one level:
+  the `./` prefix counted as a path segment.
+- An unreadable `SKILL.md` aborted the whole run with exit 2 and reported
+  nothing. It is now a single `unreadable` error on that skill, and the rest of
+  the tree still lints.
+- Skills are linted in a stable order. `readdir` order is filesystem-dependent,
+  so the same tree could report findings in a different order on another
+  machine.
+
 ## [0.1.1] - 2026-07-23
 
 ### Fixed
@@ -29,5 +51,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `--json` and `--strict` flags; exit codes 0 (clean or warnings), 1 (errors or
   any warning under `--strict`), 2 (no skills found or the path is unreadable).
 
+[Unreleased]: https://github.com/svyatov/agentskills-lint/compare/v0.1.1...HEAD
 [0.1.1]: https://github.com/svyatov/agentskills-lint/releases/tag/v0.1.1
 [0.1.0]: https://github.com/svyatov/agentskills-lint/releases/tag/v0.1.0

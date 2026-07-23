@@ -21,3 +21,18 @@ it("walks subdirectories to find skills", () => {
 it("throws NoSkillsError on a missing path", () => {
   expect(() => discover("/no/such/path")).toThrow(NoSkillsError);
 });
+
+it("throws NoSkillsError when the target is a file", () => {
+  const dir = makeSkill("solo", "---\nname: solo\ndescription: x.\n---\n");
+  expect(() => discover(join(dir, "SKILL.md"))).toThrow(NoSkillsError);
+});
+
+it("returns skills in a stable order", () => {
+  const dir = makeSkill("b", "---\nname: b\ndescription: x.\n---\n");
+  const parent = join(dir, "..");
+  for (const name of ["c", "a"]) {
+    mkdirSync(join(parent, name), { recursive: true });
+    writeFileSync(join(parent, name, "SKILL.md"), `---\nname: ${name}\ndescription: x.\n---\n`);
+  }
+  expect(discover(parent).map((d) => d.split("/").pop())).toEqual(["a", "b", "c"]);
+});

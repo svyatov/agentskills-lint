@@ -13,6 +13,12 @@ function mkKey(
   return { file: ctx.file, line: p.line, col: p.col, severity, rule, message };
 }
 
+/** The frontmatter value at `key`, only when it is a string. */
+function str(ctx: SkillContext, key: string): string | undefined {
+  const v = ctx.frontmatter?.[key];
+  return typeof v === "string" ? v : undefined;
+}
+
 function mkLine(
   ctx: SkillContext,
   line: number,
@@ -24,9 +30,9 @@ function mkLine(
 }
 
 const nameRequired: Rule = (ctx) => {
-  const n = ctx.frontmatter?.name;
-  return typeof n !== "string" || n.trim() === ""
-    ? [
+  return str(ctx, "name")?.trim()
+    ? []
+    : [
         mkKey(
           ctx,
           "name",
@@ -34,13 +40,12 @@ const nameRequired: Rule = (ctx) => {
           "name-required",
           "`name` is required and must be a non-empty string.",
         ),
-      ]
-    : [];
+      ];
 };
 
 const nameLength: Rule = (ctx) => {
-  const n = ctx.frontmatter?.name;
-  return typeof n === "string" && n.length > 64
+  const n = str(ctx, "name");
+  return n && n.length > 64
     ? [
         mkKey(
           ctx,
@@ -54,8 +59,8 @@ const nameLength: Rule = (ctx) => {
 };
 
 const nameCharset: Rule = (ctx) => {
-  const n = ctx.frontmatter?.name;
-  return typeof n === "string" && n.length > 0 && !/^[a-z0-9-]+$/.test(n)
+  const n = str(ctx, "name");
+  return n && !/^[a-z0-9-]+$/.test(n)
     ? [
         mkKey(
           ctx,
@@ -69,9 +74,8 @@ const nameCharset: Rule = (ctx) => {
 };
 
 const nameHyphens: Rule = (ctx) => {
-  const n = ctx.frontmatter?.name;
-  if (typeof n !== "string" || n.length === 0) return [];
-  return n.startsWith("-") || n.endsWith("-") || n.includes("--")
+  const n = str(ctx, "name");
+  return n && (n.startsWith("-") || n.endsWith("-") || n.includes("--"))
     ? [
         mkKey(
           ctx,
@@ -85,9 +89,9 @@ const nameHyphens: Rule = (ctx) => {
 };
 
 const nameDirMatch: Rule = (ctx) => {
-  const n = ctx.frontmatter?.name;
+  const n = str(ctx, "name");
   const dir = basename(ctx.dir);
-  return typeof n === "string" && n.length > 0 && n !== dir
+  return n && n !== dir
     ? [
         mkKey(
           ctx,
@@ -101,9 +105,9 @@ const nameDirMatch: Rule = (ctx) => {
 };
 
 const descriptionRequired: Rule = (ctx) => {
-  const d = ctx.frontmatter?.description;
-  return typeof d !== "string" || d.trim() === ""
-    ? [
+  return str(ctx, "description")?.trim()
+    ? []
+    : [
         mkKey(
           ctx,
           "description",
@@ -111,13 +115,12 @@ const descriptionRequired: Rule = (ctx) => {
           "description-required",
           "`description` is required and must be a non-empty string.",
         ),
-      ]
-    : [];
+      ];
 };
 
 const descriptionLength: Rule = (ctx) => {
-  const d = ctx.frontmatter?.description;
-  return typeof d === "string" && d.length > 1024
+  const d = str(ctx, "description");
+  return d && d.length > 1024
     ? [
         mkKey(
           ctx,
@@ -131,8 +134,8 @@ const descriptionLength: Rule = (ctx) => {
 };
 
 const compatibilityLength: Rule = (ctx) => {
-  const c = ctx.frontmatter?.compatibility;
-  return typeof c === "string" && c.length > 500
+  const c = str(ctx, "compatibility");
+  return c && c.length > 500
     ? [
         mkKey(
           ctx,
@@ -174,14 +177,18 @@ const SPEC_KEYS = new Set([
   "metadata",
   "allowed-tools",
 ]);
-const TRIGGER_CUES = [/\bwhen\b/i, /\bif\b/i, /\buse\b/i, /\bfor\b/i];
+const TRIGGER_CUES = /\b(when|if|use|for)\b/i;
 
 // ponytail: TLD list is a heuristic ceiling; a real local file named e.g. `notes.io` would be skipped. Extend the list if that ever bites.
 const COMMON_TLD = /\.(com|org|net|io|dev|co|app|ai|gov|edu|info|xyz|sh)$/i;
 
 function cleanRef(raw: string | undefined): string | null {
   if (!raw) return null;
-  const p = ((raw.split("#")[0] ?? "").split("?")[0]?.trim() ?? "").replace(/[.,;:!?)\]}]+$/, "");
+  const p = ((raw.split("#")[0] ?? "").split("?")[0]?.trim() ?? "")
+    .replace(/[.,;:!?)\]}]+$/, "")
+    // `./references/a.md` is one level deep, not two: drop the prefix before
+    // anything counts segments or joins the path.
+    .replace(/^(?:\.\/)+/, "");
   if (p === "" || p.startsWith("/") || p.startsWith("#")) return null;
   if (/^[a-z][a-z0-9+.-]*:/i.test(p)) return null; // http:, https:, mailto:
   if (COMMON_TLD.test(p.split("/")[0] ?? "")) return null; // example.com, www.foo.io/page
@@ -208,8 +215,10 @@ function refLine(ctx: SkillContext, ref: string): number {
 }
 
 const descriptionWeak: Rule = (ctx) => {
-  const d = ctx.frontmatter?.description;
-  if (typeof d !== "string" || d.trim() === "") return [];
+  // Length is measured raw, like `description-length`: a block scalar keeps its
+  // trailing newline, and trimming here would move the 40-character boundary.
+  const d = str(ctx, "description");
+  if (!d?.trim()) return [];
   if (d.length < 40)
     return [
       mkKey(
@@ -220,7 +229,7 @@ const descriptionWeak: Rule = (ctx) => {
         `\`description\` is only ${d.length} characters; describe both what the skill does and when to use it.`,
       ),
     ];
-  if (!TRIGGER_CUES.some((re) => re.test(d)))
+  if (!TRIGGER_CUES.test(d))
     return [
       mkKey(
         ctx,
@@ -335,5 +344,3 @@ export const RULES: Rule[] = [
   unknownKey,
   emptyBody,
 ];
-
-export { mkKey, mkLine };

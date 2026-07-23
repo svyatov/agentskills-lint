@@ -1,5 +1,9 @@
 # agentskills-lint
 
+[![npm version](https://img.shields.io/npm/v/agentskills-lint?style=flat-square)](https://www.npmjs.com/package/agentskills-lint)
+[![CI](https://img.shields.io/github/actions/workflow/status/svyatov/agentskills-lint/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/svyatov/agentskills-lint/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/codecov/c/github/svyatov/agentskills-lint?style=flat-square)](https://codecov.io/gh/svyatov/agentskills-lint)
+
 Zero-config linter for the [Agent Skills specification](https://agentskills.io/specification).
 
 ## Usage
@@ -12,7 +16,7 @@ directory is walked for skills.
 
 ## Flags
 
-- `--json` — emit findings as JSON.
+- `--json` — emit `{ "findings": [...], "skillCount": n }` as JSON.
 - `--strict` — treat warnings as errors (exit 1).
 
 ## Exit codes

@@ -12,7 +12,6 @@ export interface Finding {
 export interface SkillContext {
   dir: string;
   file: string;
-  raw: string;
   lines: string[];
   frontmatter: Record<string, unknown> | null;
   body: string;

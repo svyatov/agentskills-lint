@@ -29,12 +29,18 @@ it("exit 0 for warnings only, 1 under strict", () => {
   expect(computeExit(r, true)).toBe(1);
 });
 
-it("json render is parseable and lists findings", () => {
+it("json render carries the findings and the skill count", () => {
   const out = render(
     { findings: [err], skillCount: 1 },
     { json: true, strict: false, color: false },
   );
-  expect(JSON.parse(out)).toHaveLength(1);
+  expect(JSON.parse(out)).toEqual({ findings: [err], skillCount: 1 });
+});
+
+it("colors only when asked to", () => {
+  const r: Result = { findings: [err], skillCount: 1 };
+  expect(render(r, { json: false, strict: false, color: true })).toContain("\x1b[");
+  expect(render(r, { json: false, strict: false, color: false })).not.toContain("\x1b[");
 });
 
 it("human render includes location, rule, and summary", () => {

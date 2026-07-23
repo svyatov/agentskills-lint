@@ -1,11 +1,15 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-export class NoSkillsError extends Error {}
+export class NoSkillsError extends Error {
+  override name = "NoSkillsError";
+}
 
 function walk(dir: string, out: string[]): void {
   for (const ent of readdirSync(dir, { withFileTypes: true })) {
-    if (!ent.isDirectory() || ent.isSymbolicLink()) continue;
+    // Dirent types come from the directory entry, so a symlink reports as a link,
+    // never a directory: this also keeps the walk from following symlinked trees.
+    if (!ent.isDirectory()) continue;
     if (ent.name === "node_modules" || ent.name === ".git") continue;
     const sub = join(dir, ent.name);
     if (existsSync(join(sub, "SKILL.md"))) out.push(sub);
@@ -19,5 +23,7 @@ export function discover(target: string): string[] {
   if (existsSync(join(target, "SKILL.md"))) return [target];
   const out: string[] = [];
   walk(target, out);
-  return out;
+  // readdir order is filesystem-dependent; sort so findings come out the same
+  // on every machine.
+  return out.sort();
 }

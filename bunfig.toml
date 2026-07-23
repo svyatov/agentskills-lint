@@ -1,0 +1,10 @@
+[test]
+# `src/bin.ts` is the process bootstrap: it cannot run in-process without exiting
+# the test runner, and CI already runs the real bin from the packed tarball.
+coveragePathIgnorePatterns = ["src/bin.ts", "tests/**"]
+# Lines and statements are the real gate, both pinned at 100%. Unspecified keys
+# default to 100%, so `functions` has to be listed at all: Bun's function
+# threshold measures against a denominator that does not match its own report
+# (94% shown, yet a 0.7 floor fails), so it is parked low instead of left to
+# fail the build for a number nobody can reproduce from the table.
+coverageThreshold = { lines = 1.0, statements = 1.0, functions = 0.6 }
