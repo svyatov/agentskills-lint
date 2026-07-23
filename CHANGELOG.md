@@ -4,13 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-07-23
 
 ### Changed
 
 - **Breaking:** `--json` now emits `{ "findings": [...], "skillCount": n }`
   instead of a bare findings array, so JSON consumers can read the skill count
   the human output already reported.
+- The `bin` entry moved from `dist/cli.js` to `dist/bin.js`. The published
+  command name is unchanged; only the file behind it moved, so the shebang and
+  the process bootstrap sit in a module that is never imported.
 
 ### Fixed
 
@@ -51,6 +54,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `--json` and `--strict` flags; exit codes 0 (clean or warnings), 1 (errors or
   any warning under `--strict`), 2 (no skills found or the path is unreadable).
 
-[Unreleased]: https://github.com/svyatov/agentskills-lint/compare/v0.1.1...HEAD
+[0.2.0]: https://github.com/svyatov/agentskills-lint/releases/tag/v0.2.0
 [0.1.1]: https://github.com/svyatov/agentskills-lint/releases/tag/v0.1.1
 [0.1.0]: https://github.com/svyatov/agentskills-lint/releases/tag/v0.1.0
