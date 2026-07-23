@@ -1,4 +1,5 @@
-import { basename } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { Finding, Rule, Severity, SkillContext } from "./types.ts";
 
 function mkKey(
@@ -165,6 +166,153 @@ const metadataStringMap: Rule = (ctx) => {
       ];
 };
 
+const SPEC_KEYS = new Set([
+  "name",
+  "description",
+  "license",
+  "compatibility",
+  "metadata",
+  "allowed-tools",
+]);
+const TRIGGER_CUES = [/\bwhen\b/i, /\bif\b/i, /\buse\b/i, /\bfor\b/i];
+
+function cleanRef(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const p = (raw.split("#")[0] ?? "").split("?")[0]?.trim() ?? "";
+  if (p === "" || p.startsWith("/") || p.startsWith("#")) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(p)) return null; // http:, https:, mailto:
+  if (!p.includes("/") && !/\.[A-Za-z0-9]+$/.test(p)) return null;
+  return p;
+}
+
+function extractRefs(body: string): string[] {
+  const refs = new Set<string>();
+  for (const m of body.matchAll(/\]\(([^)\s]+)\)/g)) {
+    const p = cleanRef(m[1]);
+    if (p) refs.add(p);
+  }
+  for (const m of body.matchAll(/(?:^|[\s`])((?:references|scripts|assets)\/[A-Za-z0-9._/-]+)/g)) {
+    const p = cleanRef(m[1]);
+    if (p) refs.add(p);
+  }
+  return [...refs];
+}
+
+function refLine(ctx: SkillContext, ref: string): number {
+  const idx = ctx.lines.findIndex((l) => l.includes(ref));
+  return idx >= 0 ? idx + 1 : ctx.bodyStartLine;
+}
+
+const descriptionWeak: Rule = (ctx) => {
+  const d = ctx.frontmatter?.description;
+  if (typeof d !== "string" || d.trim() === "") return [];
+  if (d.length < 40)
+    return [
+      mkKey(
+        ctx,
+        "description",
+        "warning",
+        "description-weak",
+        `\`description\` is only ${d.length} characters; describe both what the skill does and when to use it.`,
+      ),
+    ];
+  if (!TRIGGER_CUES.some((re) => re.test(d)))
+    return [
+      mkKey(
+        ctx,
+        "description",
+        "warning",
+        "description-weak",
+        "`description` may not say *when* to use the skill; agents rely on that to trigger it.",
+      ),
+    ];
+  return [];
+};
+
+const bodyLineLimit: Rule = (ctx) => {
+  const count = ctx.body.split("\n").length;
+  return count > 500
+    ? [
+        mkLine(
+          ctx,
+          ctx.bodyStartLine,
+          "warning",
+          "body-line-limit",
+          `SKILL.md body is ${count} lines; keep it under 500 and move detail into references/.`,
+        ),
+      ]
+    : [];
+};
+
+const bodyTokenEstimate: Rule = (ctx) => {
+  const est = Math.ceil(ctx.body.length / 4);
+  return est > 5000
+    ? [
+        mkLine(
+          ctx,
+          ctx.bodyStartLine,
+          "warning",
+          "body-token-estimate",
+          `SKILL.md body is ~${est} tokens (estimate); the recommended budget is 5000. Split into references/.`,
+        ),
+      ]
+    : [];
+};
+
+const brokenReference: Rule = (ctx) =>
+  extractRefs(ctx.body)
+    .filter((ref) => !existsSync(join(ctx.dir, ref)))
+    .map((ref) =>
+      mkLine(
+        ctx,
+        refLine(ctx, ref),
+        "warning",
+        "broken-reference",
+        `Referenced file \`${ref}\` does not exist in the skill.`,
+      ),
+    );
+
+const referenceDepth: Rule = (ctx) =>
+  extractRefs(ctx.body)
+    .filter((ref) => ref.split("/").length > 2)
+    .map((ref) =>
+      mkLine(
+        ctx,
+        refLine(ctx, ref),
+        "warning",
+        "reference-depth",
+        `Referenced file \`${ref}\` is nested more than one level below the skill root.`,
+      ),
+    );
+
+const unknownKey: Rule = (ctx) => {
+  if (!ctx.frontmatter) return [];
+  return Object.keys(ctx.frontmatter)
+    .filter((k) => !SPEC_KEYS.has(k))
+    .map((k) =>
+      mkKey(
+        ctx,
+        k,
+        "warning",
+        "unknown-frontmatter-key",
+        `Unknown frontmatter key \`${k}\`; the spec defines name, description, license, compatibility, metadata, allowed-tools.`,
+      ),
+    );
+};
+
+const emptyBody: Rule = (ctx) =>
+  ctx.frontmatter && ctx.body.trim() === ""
+    ? [
+        mkLine(
+          ctx,
+          ctx.bodyStartLine,
+          "warning",
+          "empty-body",
+          "SKILL.md has no instructions; the body is where the skill does its work.",
+        ),
+      ]
+    : [];
+
 export const RULES: Rule[] = [
   nameRequired,
   nameLength,
@@ -175,6 +323,13 @@ export const RULES: Rule[] = [
   descriptionLength,
   compatibilityLength,
   metadataStringMap,
+  descriptionWeak,
+  bodyLineLimit,
+  bodyTokenEstimate,
+  brokenReference,
+  referenceDepth,
+  unknownKey,
+  emptyBody,
 ];
 
 export { mkKey, mkLine };
